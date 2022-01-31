@@ -1,60 +1,99 @@
 /// ignore_for_file: non_constant_identifier_names, avoid_print, unused_local_variable, dead_code, constant_identifier_names
 
 import 'dart:io';
-import 'dart:math' show min;
+import 'dart:math' show min, sqrt, pow;
 
 import '../svg/parser.dart';
+import '../common/Point.dart';
 
 import 'bezier_cubic.dart' as bezier_cubic;
-import 'settings.dart';
 import 'package:xml/xml.dart';
 import 'package:path/path.dart';
 
-double computePathLength(String path) =>
+double _computePathLength(String path) =>
     parse_path(path).size(error: 1e-8).toDouble();
 
-String shescape(path) => "'${path.replace(RegExp(r"(?=['\\\\])"), "\\\\")}'";
+String _shescape(String path) =>
+    "'${path.replaceAll(RegExp(r"(?=['\\\\])"), "\\\\")}'";
 
-String dedent(String s) {
-  final withoutEmptyLines =
-      s.split('\n').where((l) => l.isNotEmpty).toList();
-  final whitespaceAmounts = [
-    for (final line in withoutEmptyLines)
-      line.split('').takeWhile((c) => c == ' ').length
-  ];
-  final whitespaceToRemove = whitespaceAmounts.reduce(min);
-  return withoutEmptyLines.map((l) => l.replaceRange(0, whitespaceToRemove, '')).join('\n');
+extension _Dedent on String {
+  String get dedented {
+    final withoutEmptyLines =
+        this.split('\n').where((l) => l.isNotEmpty).toList();
+    final whitespaceAmounts = [
+      for (final line in withoutEmptyLines)
+        line.split('').takeWhile((c) => c == ' ').length
+    ];
+    final whitespaceToRemove = whitespaceAmounts.reduce(min);
+    return withoutEmptyLines
+        .map((l) => l.replaceRange(0, whitespaceToRemove, ''))
+        .join('\n');
+  }
+}
+
+class JsAnimationElement {
+  final XmlDocumentFragment bg;
+  final XmlDocumentFragment anim;
+  final XmlDocumentFragment? brush;
+  final XmlDocumentFragment? brushBorder;
+
+  /// the time set (as default) for each animation
+  final num time;
+
+  const JsAnimationElement({
+    required this.bg,
+    required this.anim,
+    required this.time,
+    this.brush,
+    this.brushBorder,
+  });
 }
 
 // ease, ease-in, etc:
 // https://developer.mozilla.org/en-US/docs/Web/CSS/timing-function#ease
-const pt1 = bezier_cubic.Point(0, 0);
-const easeCt1 = bezier_cubic.Point(0.25, 0.1);
-const easeCt2 = bezier_cubic.Point(0.25, 1.0);
-const easeInCt1 = bezier_cubic.Point(0.42, 0.0);
-const easeInCt2 = bezier_cubic.Point(1.0, 1.0);
-const easeInOutCt1 = bezier_cubic.Point(0.42, 0.0);
-const easeInOutCt2 = bezier_cubic.Point(0.58, 1.0);
-const easeOutCt1 = bezier_cubic.Point(0.0, 0.0);
-const easeOutCt2 = bezier_cubic.Point(0.58, 1.0);
-const pt2 = bezier_cubic.Point(1, 1);
+const pt1 = Point(0, 0);
+const easeCt1 = Point(0.25, 0.1);
+const easeCt2 = Point(0.25, 1.0);
+const easeInCt1 = Point(0.42, 0.0);
+const easeInCt2 = Point(1.0, 1.0);
+const easeInOutCt1 = Point(0.42, 0.0);
+const easeInOutCt2 = Point(0.58, 1.0);
+const easeOutCt1 = Point(0.0, 0.0);
+const easeOutCt2 = Point(0.58, 1.0);
+const pt2 = Point(1, 1);
 
-double linear(x) => x;
-double ease(x) => bezier_cubic.value(pt1, easeCt1, easeCt2, pt2, x);
-double easeIn(x) => bezier_cubic.value(pt1, easeInCt1, easeInCt2, pt2, x);
-double easeInOut(x) =>
-    bezier_cubic.value(pt1, easeInOutCt1, easeInOutCt2, pt2, x);
-double easeOut(x) => bezier_cubic.value(pt1, easeOutCt1, easeOutCt2, pt2, x);
+// class  {
+// }
 
-const Map<String, double Function(double)> timingFunctions = {
-  'linear': linear,
-  'ease': ease,
-  'ease-in': easeIn,
-  'ease-in-out': easeInOut,
-  'ease-out': easeOut
-};
+enum TimingFunction {
+  linear,
+  ease,
+  easeIn,
+  easeInOut,
+  easeOut,
+}
 
-final myTimingFunction = timingFunctions[TIMING_FUNCTION]!;
+extension Funcs on TimingFunction {
+  double Function(double) get func => {
+        TimingFunction.linear: (double x) => x,
+        TimingFunction.ease: (double x) =>
+            bezier_cubic.value(pt1, easeCt1, easeCt2, pt2, x),
+        TimingFunction.easeIn: (double x) =>
+            bezier_cubic.value(pt1, easeInCt1, easeInCt2, pt2, x),
+        TimingFunction.easeInOut: (double x) =>
+            bezier_cubic.value(pt1, easeInOutCt1, easeInOutCt2, pt2, x),
+        TimingFunction.easeOut: (double x) =>
+            bezier_cubic.value(pt1, easeOutCt1, easeOutCt2, pt2, x),
+      }[this]!;
+
+  String get name => {
+        TimingFunction.linear: 'linear',
+        TimingFunction.ease: 'ease',
+        TimingFunction.easeIn: 'ease-in',
+        TimingFunction.easeInOut: 'ease-in-out',
+        TimingFunction.easeOut: 'ease-out',
+      }[this]!;
+}
 
 // we will need this to deal with svg
 const namespaces = {
@@ -64,19 +103,29 @@ const namespaces = {
 // etree.register_namespace("xlink","http://www.w3.org/1999/xlink")
 // final parser = etree.XMLParser(remove_blank_text=true);
 
-void createAnimation(String filename) {
-  print('processing $filename');
-  final String filenameNoext = filename.replaceAll(RegExp(r'\.[^\.]+$'), '');
-  final String baseid = basename(filenameNoext);
+// gif settings
+// const DELETE_TEMPORARY_FILES = false;
+const GIF_SIZE = 150;
+const GIF_FRAME_DURATION = 0.04;
+const GIF_BACKGROUND_COLOR = '#ddf';
+// set to true to allow transparent background, much bigger file!
+// const GIF_ALLOW_TRANSPARENT = false;
 
-  // load xml
-  final XmlDocument doc = XmlDocument.parse(File(filename).readAsStringSync());
+// edit here to decide what will be generated
+const GENERATE_SVG = true;
+const GENERATE_JS_SVG = true;
+const GENERATE_GIF = true;
 
-  // for xlink namespace introduction
-  doc.rootElement.setAttribute('xmlns:xlink', namespaces['xlink']);
-  doc.rootElement.setAttribute('xlink:used', '');
+/// sqrt, ie a stroke 4 times the length is drawn
+/// at twice the speed, in twice the time.
+double strokeLengthToDuration(double length) => sqrt(length) / 8;
 
-  // clear all extra elements this program may have previously added
+/// global time rescale, let's make animation a bit
+/// faster when there are many strokes.
+double timeRescale(interval) => pow(2 * interval, 2.0 / 3).toDouble();
+
+/// clear all extra elements this program may have previously added
+void clearPreviousElements(XmlDocument doc) {
   for (final XmlNode el in doc
           .getElement('svg', namespace: namespaces['n'])
           ?.getElement('style', namespace: namespaces['n'])
@@ -95,10 +144,49 @@ void createAnimation(String filename) {
       g.parent!.children.remove(g);
     }
   }
+}
 
-  // create groups with a copies (references actually) of the paths
-  XmlDocumentFragment pathCopyGroup(
-      {required String id, required String color, required double width}) {
+/// Note: setting any color to transparent will result in a much bigger
+/// filesize for GIFs.
+void createAnimation({
+  required String inputFile,
+  String? outputFile,
+  TimingFunction timingFunction = TimingFunction.easeInOut,
+  double strokeBorderWidth = 4.5,
+  double strokeUnfilledWidth = 3,
+  double strokeFilledWidth = 3.1,
+  bool showBrush = true,
+  bool showBrushFrontBorder = true,
+  double brushWidth = 5.5,
+  double brushBorderWidth = 7,
+  double waitAfter = 1.5,
+  String strokeBorderColor = '#666',
+  String strokeUnfilledColor = '#EEE',
+  String strokeFillingColor = '#F00',
+  String strokeFilledColor = '#000',
+  String brushColor = '#F00',
+  String brushBorderColor = '#666',
+}) {
+  print('processing $inputFile');
+  final String filenameNoext = inputFile.replaceAll(RegExp(r'\.[^\.]+$'), '');
+  outputFile ??= '${filenameNoext}_anim.svg';
+  final String baseid = basename(filenameNoext);
+
+  // load xml
+  final XmlDocument doc = XmlDocument.parse(File(inputFile).readAsStringSync());
+
+  // for xlink namespace introduction
+  doc.rootElement.setAttribute('xmlns:xlink', namespaces['xlink']);
+  doc.rootElement.setAttribute('xlink:used', '');
+
+  clearPreviousElements(doc);
+
+  /// create groups with a copies (references actually) of the paths
+  XmlDocumentFragment pathCopyGroup({
+    required String id,
+    required String color,
+    required double width,
+  }) {
     final builder = XmlBuilder();
     builder.element(
       'g',
@@ -117,27 +205,27 @@ void createAnimation(String filename) {
 
   final bgGroup = pathCopyGroup(
     id: 'bg',
-    color: STOKE_UNFILLED_COLOR,
-    width: STOKE_UNFILLED_WIDTH,
+    color: strokeUnfilledColor,
+    width: strokeUnfilledWidth,
   );
   final animGroup = pathCopyGroup(
     id: 'anim',
-    color: STOKE_FILLED_COLOR,
-    width: STOKE_FILLED_WIDTH,
+    color: strokeFilledColor,
+    width: strokeFilledWidth,
   );
 
   late final XmlDocumentFragment brushGroup;
   late final XmlDocumentFragment brushBrdGroup;
-  if (SHOW_BRUSH) {
+  if (showBrush) {
     brushGroup = pathCopyGroup(
       id: 'brush',
-      color: BRUSH_COLOR,
-      width: BRUSH_WIDTH,
+      color: brushColor,
+      width: brushWidth,
     );
     brushBrdGroup = pathCopyGroup(
       id: 'brush-brd',
-      color: BRUSH_BORDER_COLOR,
-      width: BRUSH_BORDER_WIDTH,
+      color: brushBorderColor,
+      width: brushBorderWidth,
     );
   }
 
@@ -156,22 +244,23 @@ void createAnimation(String filename) {
     }
 
     for (final p in g.findAllElements('path', namespace: namespaces['n'])) {
-      final pathlen = computePathLength(p.getAttribute('d')!);
-      final duration = stroke_length_to_duration(pathlen);
+      final pathlen = _computePathLength(p.getAttribute('d')!);
+      final duration = strokeLengthToDuration(pathlen);
       totlen += pathlen;
       tottime += duration;
     }
   }
 
-  double animationTime = time_rescale(tottime); // math.pow(3 * tottime, 2.0/3)
-  tottime += WAIT_AFTER * tottime / animationTime;
+  double animationTime = timeRescale(tottime); // math.pow(3 * tottime, 2.0/3)
+  tottime += waitAfter * tottime / animationTime;
   final double actualAnimationTime = animationTime;
-  animationTime += WAIT_AFTER;
+  animationTime += waitAfter;
 
   final Map<int, String> staticCss = {};
   late String animatedCss;
-  final jsAnimationElements = []; // collect the ids of animating elements
-  final jsAnimationTimes = []; // the time set (as default) for each animation
+
+  /// collect the ids of animating elements
+  final List<JsAnimationElement> jsAnimationElements = [];
 
   String jsAnimatedCss = '';
 
@@ -186,18 +275,18 @@ void createAnimation(String filename) {
           }
           ''';
   }
+  late final int lastFrameIndex;
+  late final double lastFrameDelay;
   if (GENERATE_GIF) {
     // final static_css = {};
-    final last_frame_index = actualAnimationTime ~/ GIF_FRAME_DURATION + 1;
-    for (int i = 0; i < last_frame_index + 1; i++) {
+    lastFrameIndex = actualAnimationTime ~/ GIF_FRAME_DURATION + 1;
+    for (int i = 0; i < lastFrameIndex + 1; i++) {
       staticCss[i] = cssHeader;
     }
-    final last_frame_delay =
-        animationTime - last_frame_index * GIF_FRAME_DURATION;
+    lastFrameDelay = animationTime - lastFrameIndex * GIF_FRAME_DURATION;
   }
   double elapsedlen = 0;
   double elapsedtime = 0;
-
 
   // add css elements for all strokes
   for (final XmlNode g in doc
@@ -206,11 +295,12 @@ void createAnimation(String filename) {
     // for (final g in doc.xpath("/n:svg/n:g", namespaces=namespaces)){
     final groupid = g.getAttribute('id') ?? '';
     if (RegExp(r'^kvg:StrokeNumbers_').hasMatch(groupid)) {
-      final String rule = dedent('''
+      final String rule = '''
           #${groupid.replaceAll(':', '\\3a ')} {
               display: none;
           }
-          ''');
+          '''
+          .dedented;
       if (GENERATE_SVG) animatedCss += rule;
       if (GENERATE_JS_SVG) jsAnimatedCss += rule;
       if (GENERATE_GIF) {
@@ -222,12 +312,13 @@ void createAnimation(String filename) {
     }
 
     final gidcss = groupid.replaceAll(':', '\\3a ');
-    final rule = dedent('''
+    final rule = '''
         #$gidcss {
-            stroke-width: ${STOKE_BORDER_WIDTH.toStringAsFixed(1)}px !important;
-            stroke:       $STOKE_BORDER_COLOR !important;
+            stroke-width: ${strokeBorderWidth.toStringAsFixed(1)}px !important;
+            stroke:       $strokeBorderColor !important;
         }
-        ''');
+        '''
+        .dedented;
 
     if (GENERATE_SVG) animatedCss += rule;
     if (GENERATE_JS_SVG) jsAnimatedCss += rule;
@@ -241,39 +332,47 @@ void createAnimation(String filename) {
       final pathid = p.getAttribute('id') as String;
       final pathidcss = pathid.replaceAll(':', '\\3a ');
 
-      if (GENERATE_JS_SVG) jsAnimationElements.add({});
-
-      void addHref(String suffix, XmlDocumentFragment element) {
+      XmlDocumentFragment addHref(String suffix, XmlDocumentFragment parent) {
         final builder = XmlBuilder();
         builder.element(
           'use',
           attributes: {'id': '$pathid-$suffix', 'xlink:href': '#$pathid'},
         );
         final ref = builder.buildFragment();
-        element.firstElementChild!.children.add(ref);
-        if (GENERATE_JS_SVG) jsAnimationElements.last[suffix] = ref;
+        parent.firstElementChild!.children.add(ref);
+        return ref;
       }
 
       final String bgPathidcss = '$pathidcss-bg';
       final String animPathidcss = '$pathidcss-anim';
       final String brushPathidcss = '$pathidcss-brush';
-      final String brushBrdPathidcss = '$pathidcss-brush-brd';
+      final String brushBorderPathidcss = '$pathidcss-brush-brd';
 
-      addHref('bg', bgGroup);
-      addHref('anim', animGroup);
-
-      if (SHOW_BRUSH) {
-        addHref('brush', brushGroup);
-        addHref('brush-brd', brushBrdGroup);
+      final bgGroupElement = addHref('bg', bgGroup);
+      final animGroupElement = addHref('anim', animGroup);
+      XmlDocumentFragment? brushGroupElement;
+      XmlDocumentFragment? brushBorderGroupElement;
+      if (showBrush) {
+        brushGroupElement = addHref('brush', brushGroup);
+        brushBorderGroupElement = addHref('brush-brd', brushBrdGroup);
       }
 
       final pathname = pathid.replaceAll(RegExp(r'^kvg:'), '');
-      final pathlen = computePathLength(p.getAttribute('d') as String);
-      final duration = stroke_length_to_duration(pathlen);
-      final relduration = duration * tottime / animationTime; // unscaled time
+      final pathlen = _computePathLength(p.getAttribute('d') as String);
+      final duration = strokeLengthToDuration(pathlen);
+      final relativeDuration =
+          duration * tottime / animationTime; // unscaled time
 
       if (GENERATE_JS_SVG) {
-        jsAnimationTimes.add(relduration);
+        jsAnimationElements.add(
+          JsAnimationElement(
+            bg: bgGroupElement,
+            anim: animGroupElement,
+            brush: brushGroupElement,
+            brushBorder: brushBorderGroupElement,
+            time: relativeDuration,
+          ),
+        );
       }
 
       final newelapsedlen = elapsedlen + pathlen;
@@ -283,7 +382,7 @@ void createAnimation(String filename) {
 
       if (GENERATE_SVG) {
         // animation stroke progression
-        animatedCss += dedent('''
+        animatedCss += '''
             @keyframes strike-$pathname {
                 0% { stroke-dashoffset: ${pathlen.toStringAsFixed(3)}; }
                 ${animStart.toStringAsFixed(3)}% { stroke-dashoffset: ${pathlen.toStringAsFixed(3)}; }
@@ -292,52 +391,55 @@ void createAnimation(String filename) {
             }
             @keyframes showhide-$pathname {
                 ${animStart.toStringAsFixed(3)}% { visibility: hidden; }
-                ${animEnd.toStringAsFixed(3)}% { stroke: $STOKE_FILLING_COLOR; }
+                ${animEnd.toStringAsFixed(3)}% { stroke: $strokeFillingColor; }
             }
             #$animPathidcss {
                 stroke-dasharray: ${pathlen.toStringAsFixed(3)} ${pathlen.toStringAsFixed(3)};
                 stroke-dashoffset: 0;
-                animation: strike-$pathname ${animationTime.toStringAsFixed(3)}s $TIMING_FUNCTION infinite,
+                animation: strike-$pathname ${animationTime.toStringAsFixed(3)}s ${timingFunction.name} infinite,
                     showhide-$pathname ${animationTime.toStringAsFixed(3)}s step-start infinite;
             }
-            ''');
+            '''
+            .dedented;
 
-        if (SHOW_BRUSH) {
+        if (showBrush) {
           // brush element visibility
-          animatedCss += dedent('''
+          animatedCss += '''
               @keyframes showhide-brush-$pathname {
                   ${animStart.toStringAsFixed(3)}% { visibility: hidden; }
                   ${animEnd.toStringAsFixed(3)}% { visibility: visible; }
                   100% { visibility: hidden; }
               }
-              #$brushPathidcss, #$brushBrdPathidcss {
+              #$brushPathidcss, #$brushBorderPathidcss {
                   stroke-dasharray: 0 ${pathlen.toStringAsFixed(3)};
-                  animation: strike-$pathname ${animationTime.toStringAsFixed(3)}s $TIMING_FUNCTION infinite,
+                  animation: strike-$pathname ${animationTime.toStringAsFixed(3)}s ${timingFunction.name} infinite,
                       showhide-brush-$pathname ${animationTime.toStringAsFixed(3)}s step-start infinite;
               }
-              ''');
+              '''
+              .dedented;
         }
       }
 
       if (GENERATE_JS_SVG) {
-        jsAnimatedCss += '\n/* stroke $pathid */';
+        jsAnimatedCss += '\n/* stroke $pathid */\n';
 
         // brush and background hidden by default
-        if (SHOW_BRUSH) {
-          jsAnimatedCss += dedent('''
-              #$brushPathidcss, #$brushBrdPathidcss, #$bgPathidcss {
+        if (showBrush) {
+          jsAnimatedCss += '''
+              #$brushPathidcss, #$brushBorderPathidcss, #$bgPathidcss {
                   visibility: hidden;
               }
-              ''');
+              '''
+              .dedented;
         }
 
         // hide stroke after current element
-        const after_curr = '[class *= "current"]';
-        jsAnimatedCss += dedent('''
-            $after_curr ~ #$animPathidcss {
+        const afterCurrent = '[class *= "current"]';
+        jsAnimatedCss += '''
+            $afterCurrent ~ #$animPathidcss {
                 visibility: hidden;
             }
-            $after_curr ~ #$bgPathidcss, #$bgPathidcss.animate {
+            $afterCurrent ~ #$bgPathidcss, #$bgPathidcss.animate {
                 visibility: visible;
             }
             @keyframes strike-$pathname {
@@ -345,24 +447,26 @@ void createAnimation(String filename) {
                 100% { stroke-dashoffset: 0; }
             }
             #$animPathidcss.animate {
-                stroke: $STOKE_FILLING_COLOR;
+                stroke: $strokeFillingColor;
                 stroke-dasharray: ${pathlen.toStringAsFixed(3)} ${pathlen.toStringAsFixed(3)};
                 visibility: visible;
-                animation: strike-$pathname ${relduration.toStringAsFixed(3)}s $TIMING_FUNCTION forwards 1;
+                animation: strike-$pathname ${relativeDuration.toStringAsFixed(3)}s ${timingFunction.name} forwards 1;
             }
-            ''');
-        if (SHOW_BRUSH) {
-          jsAnimatedCss += dedent('''
+            '''
+            .dedented;
+        if (showBrush) {
+          jsAnimatedCss += '''
             @keyframes strike-brush-$pathname {
                 0% { stroke-dashoffset: ${pathlen.toStringAsFixed(3)}; }
                 100% { stroke-dashoffset: 0.4; }
             }
-            #$brushPathidcss.animate.brush, #$brushBrdPathidcss.animate.brush {
+            #$brushPathidcss.animate.brush, #$brushBorderPathidcss.animate.brush {
                 stroke-dasharray: 0 ${pathlen.toStringAsFixed(3)};
                 visibility: visible;
-                animation: strike-brush-$pathname ${relduration.toStringAsFixed(3)}s $TIMING_FUNCTION forwards 1;
+                animation: strike-brush-$pathname ${relativeDuration.toStringAsFixed(3)}s ${timingFunction.name} forwards 1;
             }
-            ''');
+            '''
+              .dedented;
         }
       }
 
@@ -380,51 +484,55 @@ void createAnimation(String filename) {
             // just hide everything
             rule += "#$animPathidcss";
 
-            if (SHOW_BRUSH) {
-              rule += ", #$brushPathidcss, #$brushBrdPathidcss";
+            if (showBrush) {
+              rule += ", #$brushPathidcss, #$brushBorderPathidcss";
             }
 
             staticCss[k] = staticCss[k]! +
-                dedent('''
+                '''
                 %$rule {
                     visibility: hidden;
                 }
-                ''');
+                '''
+                    .dedented;
           } else if (reltime > newelapsedtime) {
             // just hide the brush, and bg
             rule += "#$bgPathidcss";
 
-            if (SHOW_BRUSH) {
-              rule += ", #$brushPathidcss, #$brushBrdPathidcss";
+            if (showBrush) {
+              rule += ", #$brushPathidcss, #$brushBorderPathidcss";
             }
 
             staticCss[k] = staticCss[k]! +
-                dedent('''
+                '''
                 $rule {
                     visibility: hidden;
                 }
-                ''');
+                '''
+                    .dedented;
           } else {
             final intervalprop =
                 ((reltime - elapsedtime) / (newelapsedtime - elapsedtime));
-            final progression = myTimingFunction(intervalprop);
+            final progression = timingFunction.func(intervalprop);
 
             staticCss[k] = staticCss[k]! +
-                dedent('''
+                '''
                 #$animPathidcss {
                     stroke-dasharray: ${pathlen.toStringAsFixed(3)} ${(pathlen + 0.002).toStringAsFixed(3)};
                     stroke-dashoffset: ${(pathlen * (1 - progression) + 0.0015).toStringAsFixed(4)};
-                    stroke: $STOKE_FILLING_COLOR;
+                    stroke: $strokeFillingColor;
                 }
-                ''');
-            if (SHOW_BRUSH) {
+                '''
+                    .dedented;
+            if (showBrush) {
               staticCss[k] = staticCss[k]! +
-                  dedent('''
-                  #$brushPathidcss, #$brushBrdPathidcss {
+                  '''
+                  #$brushPathidcss, #$brushBorderPathidcss {
                       stroke-dasharray: 0.001 ${(pathlen + 0.002).toStringAsFixed(3)};
                       stroke-dashoffset: ${(pathlen * (1 - progression) + 0.0015).toStringAsFixed(4)};
                   }
-                  ''');
+                  '''
+                      .dedented;
             }
           }
         }
@@ -439,11 +547,11 @@ void createAnimation(String filename) {
       doc.root.firstElementChild?.children.add(g);
 
   // insert groups
-  if (SHOW_BRUSH && !SHOW_BRUSH_FRONT_BORDER) addGroup(brushBrdGroup);
+  if (showBrush && !showBrushFrontBorder) addGroup(brushBrdGroup);
   addGroup(bgGroup);
-  if (SHOW_BRUSH && SHOW_BRUSH_FRONT_BORDER) addGroup(brushBrdGroup);
+  if (showBrush && showBrushFrontBorder) addGroup(brushBrdGroup);
   addGroup(animGroup);
-  if (SHOW_BRUSH) addGroup(brushGroup);
+  if (showBrush) addGroup(brushGroup);
 
   if (GENERATE_SVG) {
     print(animatedCss);
@@ -456,10 +564,9 @@ void createAnimation(String filename) {
           ))
         .buildFragment();
     doc.root.firstElementChild!.children.insert(0, style);
-    final svgfile = '${filenameNoext}_anim.svg';
-    File(svgfile).writeAsStringSync(doc.toXmlString(pretty: true));
+    File(outputFile).writeAsStringSync(doc.toXmlString(pretty: true));
     doc.root.children.removeAt(0);
-    print('written $svgfile');
+    print('written $outputFile');
   }
 
   if (GENERATE_GIF) {
@@ -573,9 +680,25 @@ void createAnimation(String filename) {
 }
 
 void main(List<String> args) {
-  if (!timingFunctions.keys.contains(TIMING_FUNCTION)) {
-    throw 'Sorry, invalid timing function "$TIMING_FUNCTION"';
-  }
   // createAnimation('assets/kanjivg/kanji/0f9b1.svg');
-  createAnimation('assets/kanjivg/kanji/04f5c.svg');
+
+  const kanji = '情報科学';
+  final fileList = [];
+  for (int k = 0; k < kanji.length; k++) {
+    createAnimation(
+      inputFile: 'assets/kanjivg/kanji/${kanji.codeUnits[k].toRadixString(16).padLeft(5, '0')}.svg',
+      outputFile: '${k+1}.svg',
+    ); 
+    fileList.add('${k+1}.svg');
+  }
+
+  File('index.html').writeAsStringSync(
+    '<html>' +
+    fileList.map((e) => File(e).readAsStringSync().replaceAll(']>', '')).join('\n') +
+    '</html>'
+  );
+  // createAnimation(
+  //   inputFile: 'assets/kanjivg/kanji/060c5.svg',
+  //   outputFile: 'test.svg',
+  // );
 }

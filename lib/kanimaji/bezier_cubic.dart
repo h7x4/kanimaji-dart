@@ -1,15 +1,18 @@
 
 import 'dart:math' as math;
 
-class Point {
-  final double x;
-  final double y;
 
-  const Point(this.x, this.y);
+import '../common/Point.dart';
 
-  @override
-  String toString() => '($x,$y)';
-}
+// class Point {
+//   final double x;
+//   final double y;
+
+//   const Point(this.x, this.y);
+
+//   @override
+//   String toString() => '($x,$y)';
+// }
 
 double thrt(double x) =>
     x > 0 ? math.pow(x, 1.0 / 3).toDouble() : -math.pow(-x, 1.0 / 3).toDouble();
@@ -23,10 +26,10 @@ double cb(x) => x * x * x;
 /// x(t) = t^3 T + 3t^2(1-t) U + 3t(1-t)^2 V + (1-t)^3 W
 double time(Point pt1, Point ct1, Point ct2, Point pt2, double x) {
   // var C = Cubic, a,b,c,d,p,q,lambda,sqlambda,tmp,addcoef,t,qb,qc,norm,angle,fact;
-  final double a = pt1.x - 3 * ct1.x + 3 * ct2.x - pt2.x;
-  final double b = 3 * ct1.x - 6 * ct2.x + 3 * pt2.x;
-  final double c = 3 * ct2.x - 3 * pt2.x;
-  final double d = pt2.x - x;
+  final num a = pt1.x - 3 * ct1.x + 3 * ct2.x - pt2.x;
+  final num b = 3 * ct1.x - 6 * ct2.x + 3 * pt2.x;
+  final num c = 3 * ct2.x - 3 * pt2.x;
+  final num d = pt2.x - x;
 
   if (a.abs() < 0.000000001) { // quadratic
     if (b.abs() < 0.000000001) return -d / c; // linear

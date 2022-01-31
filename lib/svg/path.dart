@@ -1,7 +1,10 @@
 import 'dart:collection';
 import 'dart:math' as math;
 import 'dart:math' show sqrt, sin, cos, acos, log, pi;
-import 'package:bisect/bisect.dart';
+
+import 'package:bisection/extension.dart';
+
+import '../common/Point.dart';
 
 // try:
 //     from collections.abc import MutableSequence
@@ -14,45 +17,6 @@ import 'package:bisect/bisect.dart';
 double radians(num n) => n * pi / 180;
 double degrees(num n) => n * 180 / pi;
 
-class Point {
-  final num x;
-  final num y;
-
-  const Point(this.x, this.y);
-  const Point.from({this.x = 0, this.y = 0});
-  static const zero = Point(0, 0);
-
-  operator +(covariant Point p) => Point(x + p.x, y + p.y);
-  operator -(covariant Point p) => Point(x - p.x, y - p.y);
-  operator *(covariant Point p) => Point(x * p.x, y * p.y);
-  operator /(covariant Point p) => Point(x / p.x, y / p.y);
-
-  Point addX(num n) => Point(x + n, y);
-  Point addY(num n) => Point(x, y + n);
-  Point add(num n) => Point(x + n, y + n);
-
-  Point subtractX(num n) => Point(x - n, y);
-  Point subtractY(num n) => Point(x, y - n);
-  Point subtractXY(num n) => Point(x - n, y - n);
-
-  Point xSubtract(num n) => Point(n - x, y);
-  Point ySubtract(num n) => Point(x, n - y);
-  Point xySubtract(num n) => Point(n - x, n - y);
-
-  Point timesX(num n) => Point(x * n, y);
-  Point timesY(num n) => Point(x, y * n);
-  Point times(num n) => Point(x * n, y * n);
-
-  Point dividesX(num n) => Point(x / n, y);
-  Point dividesY(num n) => Point(x, y / n);
-  Point divides(num n) => Point(x / n, y / n);
-
-  Point pow(int n) => Point(math.pow(x, n), math.pow(y, n));
-  double abs() => math.sqrt(x * x + y * y);
-
-  @override
-  String toString() => '($x,$y)';
-}
 
 const defaultMinDepth = 5;
 const defaultError = 1e-12;
@@ -496,7 +460,8 @@ class Move extends SvgPath {
   Point point(num pos) => start;
 
   @override
-  double size({double error = defaultError, int minDepth = defaultMinDepth}) => 0;
+  double size({double error = defaultError, int minDepth = defaultMinDepth}) =>
+      0;
 }
 
 // Represents the closepath command
@@ -517,7 +482,7 @@ class Close extends Linear {
 
 /// A Path is a sequence of path segments
 class Path extends ListBase<SvgPath> {
-  late final List<SvgPath> segments;
+  late final List<SvgPath?> segments;
   List<num>? _memoizedLengths;
   num? _memoizedLength;
   final List<num> _fractions = [];
@@ -527,7 +492,7 @@ class Path extends ListBase<SvgPath> {
   }
 
   @override
-  SvgPath operator [](int index) => segments[index];
+  SvgPath operator [](int index) => segments[index]!;
 
   @override
   void operator []=(int index, SvgPath value) {
@@ -545,11 +510,12 @@ class Path extends ListBase<SvgPath> {
   String toString() =>
       'Path(${[for (final s in segments) s.toString()].join(", ")})';
 
-  void _calcLengths({double error = defaultError, int minDepth = defaultMinDepth}) {
+  void _calcLengths(
+      {double error = defaultError, int minDepth = defaultMinDepth}) {
     if (_memoizedLength != null) return;
 
     final lengths = [
-      for (final s in segments) s.size(error: error, minDepth: minDepth)
+      for (final s in segments) s!.size(error: error, minDepth: minDepth)
     ];
     _memoizedLength = lengths.reduce((a, b) => a + b);
     if (_memoizedLength == 0) {
@@ -569,29 +535,29 @@ class Path extends ListBase<SvgPath> {
   Point point({required num pos, double error = defaultError}) {
     // Shortcuts
     if (pos == 0.0) {
-      return segments[0].point(pos);
+      return segments[0]!.point(pos);
     }
     if (pos == 1.0) {
-      return segments.last.point(pos);
+      return segments.last!.point(pos);
     }
 
     _calcLengths(error: error);
 
     // Fix for paths of length 0 (i.e. points)
     if (length == 0) {
-      return segments[0].point(0.0);
+      return segments[0]!.point(0.0);
     }
 
     // Find which segment the point we search for is located on:
     late final num segmentPos;
-    int i = _fractions.bisect(pos);
+    int i = _fractions.bisectRight(pos);
     if (i == 0) {
       segmentPos = pos / _fractions[0];
     } else {
       segmentPos =
           (pos - _fractions[i - 1]) / (_fractions[i] - _fractions[i - 1]);
     }
-    return segments[i].point(segmentPos);
+    return segments[i]!.point(segmentPos);
   }
 
   num size({error = defaultError, minDepth = defaultMinDepth}) {

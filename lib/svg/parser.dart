@@ -1,7 +1,7 @@
 /// SVG Path specification parser
 ///
-import 'path.dart'
-    show Arc, Close, CubicBezier, Line, Move, Path, Point, QuadraticBezier;
+import '../common/Point.dart';
+import 'path.dart';
 
 const COMMANDS = {
   'M',
