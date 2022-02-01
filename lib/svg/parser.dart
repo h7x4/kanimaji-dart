@@ -73,13 +73,13 @@ String _stripArray(String stringToParse) {
   return stringToParse;
 }
 
-_ParserResult<double> _parseNumber(String stringToParse) {
+_ParserResult<num> _parseNumber(String stringToParse) {
   final res = _floatPattern.firstMatch(stringToParse);
   if (res == null) {
     throw InvalidPathError("Expected a number, got '$stringToParse'.");
   }
 
-  final number = double.parse(res.group(0)!);
+  final number = num.parse(res.group(0)!);
   final start = res.start;
   final end = res.end;
   stringToParse =
@@ -89,7 +89,7 @@ _ParserResult<double> _parseNumber(String stringToParse) {
   return _ParserResult(value: number, remaining: stringToParse);
 }
 
-_ParserResult<double> _parseUnsignedNumber(String stringToParse) {
+_ParserResult<num> _parseUnsignedNumber(String stringToParse) {
   final number = _parseNumber(stringToParse);
   if (number.value < 0) {
     throw InvalidPathError("Expected a non-negative number, got '$number'.");
@@ -137,6 +137,7 @@ List<_Command> _commandifyPath(String pathdef) {
   for (String c in pathdef.split(_commandPattern)) {
     String x = c[0];
     String? y = (c.length > 1) ? c.substring(1).trim() : null;
+
     if (!_commands.contains(x)) {
       throw InvalidPathError("Path does not start with a command: $pathdef");
     }
@@ -146,9 +147,8 @@ List<_Command> _commandifyPath(String pathdef) {
     }
     if (x == "z" || x == "Z") {
       // The end command takes no arguments, so add a blank one
-      token.addAll([x, ""]);
+      token = [x, ""];
     } else {
-      // token = [x, x.substring(1).trim()];
       token = [x];
     }
 
@@ -242,7 +242,7 @@ Path parsePath(String pathdef) {
       segments.add(Line(start: currentPos, end: pos));
       currentPos = pos;
     } else if (command == "H") {
-      double hpos = token.args[0] as double;
+      num hpos = token.args[0] as num;
       if (!absolute) {
         hpos += currentPos.x;
       }
@@ -250,7 +250,7 @@ Path parsePath(String pathdef) {
       segments.add(Line(start: currentPos, end: pos));
       currentPos = pos;
     } else if (command == "V") {
-      double vpos = token.args[0] as double;
+      num vpos = token.args[0] as num;
       if (!absolute) {
         vpos += currentPos.y;
       }
@@ -304,10 +304,11 @@ Path parsePath(String pathdef) {
       }
       segments.add(
         CubicBezier(
-            start: currentPos,
-            control1: control1,
-            control2: control2,
-            end: end),
+          start: currentPos,
+          control1: control1,
+          control2: control2,
+          end: end,
+        ),
       );
       currentPos = end;
     } else if (command == "Q") {
@@ -354,8 +355,8 @@ Path parsePath(String pathdef) {
     } else if (command == "A") {
       // For some reason I implemented the Arc with a complex radius.
       // That doesn't really make much sense, but... *shrugs*
-      final radius = Point(token.args[0] as double, token.args[1] as double);
-      final rotation = token.args[2] as double;
+      final radius = Point(token.args[0] as num, token.args[1] as num);
+      final rotation = token.args[2] as num;
       final arc = token.args[3] as bool;
       final sweep = token.args[4] as bool;
       Point end = token.args[5] as Point;

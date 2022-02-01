@@ -9,30 +9,34 @@ import 'package:bisection/extension.dart';
 
 import '../common/Point.dart';
 
-double radians(num n) => n * pi / 180;
-double degrees(num n) => n * 180 / pi;
+num radians(num n) => n * pi / 180;
+num degrees(num n) => n * 180 / pi;
 
 const defaultMinDepth = 5;
 const defaultError = 1e-12;
 
+extension _RemovePointIfInt on num {
+  num get removePointIfInt => truncate() == this ? truncate() : this;
+}
+
 /// Recursively approximates the length by straight lines
-double segmentLength({
+num segmentLength({
   required SvgPath curve,
   required num start,
   required num end,
   required Point startPoint,
   required Point endPoint,
-  required double error,
+  required num error,
   required int minDepth,
-  required double depth,
+  required num depth,
 }) {
   num mid = (start + end) / 2;
   Point midPoint = curve.point(mid);
-  double length = (endPoint - startPoint).abs();
-  double firstHalf = (midPoint - startPoint).abs();
-  double secondHalf = (endPoint - midPoint).abs();
+  num length = (endPoint - startPoint).abs();
+  num firstHalf = (midPoint - startPoint).abs();
+  num secondHalf = (endPoint - midPoint).abs();
 
-  double length2 = firstHalf + secondHalf;
+  num length2 = firstHalf + secondHalf;
   if ((length2 - length > error) || (depth < minDepth)) {
     // Calculate the length of each segment:
     depth += 1;
@@ -70,11 +74,18 @@ abstract class SvgPath {
     required this.end,
   });
 
+  @override
+  bool operator ==(Object other) =>
+      other is SvgPath && start == other.start && end == other.end;
+
+  @override
+  int get hashCode => start.hashCode ^ end.hashCode;
+
   /// Calculate the x,y position at a certain position of the path
   Point point(num pos);
 
   /// Calculate the length of the path up to a certain position
-  double size({double error = defaultError, int minDepth = defaultMinDepth});
+  num size({num error = defaultError, int minDepth = defaultMinDepth});
 }
 
 abstract class Bezier extends SvgPath {
@@ -82,6 +93,12 @@ abstract class Bezier extends SvgPath {
     required Point start,
     required Point end,
   }) : super(start: start, end: end);
+
+  @override
+  bool operator ==(Object other) => other is Bezier && super == other;
+
+  @override
+  int get hashCode => super.hashCode + 0;
 
   /// Checks if this segment would be a smooth segment following the previous
   bool isSmoothFrom(Object? previous);
@@ -96,10 +113,16 @@ class Linear extends SvgPath {
   }) : super(start: start, end: end);
 
   @override
+  bool operator ==(Object other) => other is Linear && super == other;
+
+  @override
+  int get hashCode => super.hashCode + 0;
+
+  @override
   Point point(num pos) => start + (end - start).times(pos);
 
   @override
-  double size({double error = defaultError, int minDepth = defaultMinDepth}) {
+  num size({num error = defaultError, int minDepth = defaultMinDepth}) {
     final distance = end - start;
     return sqrt(distance.x * distance.x + distance.y * distance.y);
   }
@@ -110,6 +133,12 @@ class Line extends Linear {
     required Point start,
     required Point end,
   }) : super(start: start, end: end);
+
+  @override
+  bool operator ==(Object other) => other is Line && super == other;
+
+  @override
+  int get hashCode => super.hashCode + 0;
 
   @override
   String toString() {
@@ -129,6 +158,16 @@ class CubicBezier extends Bezier {
   }) : super(start: start, end: end);
 
   @override
+  bool operator ==(Object other) =>
+      other is CubicBezier &&
+      control1 == other.control1 &&
+      control2 == other.control2 &&
+      super == other;
+
+  @override
+  int get hashCode => super.hashCode ^ control1.hashCode ^ control2.hashCode;
+
+  @override
   String toString() => "CubicBezier(start=$start, control1=$control1, "
       "control2=$control2, end=$end)";
 
@@ -146,18 +185,19 @@ class CubicBezier extends Bezier {
       end.times(math.pow(pos, 3));
 
   @override
-  double size({double error = defaultError, int minDepth = defaultMinDepth}) {
+  num size({num error = defaultError, int minDepth = defaultMinDepth}) {
     final startPoint = point(0);
     final endPoint = point(1);
     return segmentLength(
-        curve: this,
-        start: 0,
-        end: 1,
-        startPoint: startPoint,
-        endPoint: endPoint,
-        error: error,
-        minDepth: minDepth,
-        depth: 0);
+      curve: this,
+      start: 0,
+      end: 1,
+      startPoint: startPoint,
+      endPoint: endPoint,
+      error: error,
+      minDepth: minDepth,
+      depth: 0,
+    );
   }
 }
 
@@ -168,10 +208,14 @@ class QuadraticBezier extends Bezier {
     required Point start,
     required Point end,
     required this.control,
-  }) : super(
-          start: start,
-          end: end,
-        );
+  }) : super(start: start, end: end);
+
+  @override
+  bool operator ==(Object other) =>
+      other is QuadraticBezier && control == other.control && super == other;
+
+  @override
+  int get hashCode => super.hashCode ^ control.hashCode;
 
   @override
   String toString() =>
@@ -190,12 +234,12 @@ class QuadraticBezier extends Bezier {
       end.times(math.pow(pos, 2));
 
   @override
-  double size({double error = defaultError, int minDepth = defaultMinDepth}) {
+  num size({num error = defaultError, int minDepth = defaultMinDepth}) {
     final Point a = start - control.times(2) + end;
     final Point b = (control - start).times(2);
     final num aDotB = a.x * b.x + a.y * b.y;
 
-    late final double s;
+    late final num s;
     if (a.abs() < 1e-12) {
       s = b.abs();
     } else if ((aDotB + a.abs() * b.abs()).abs() < 1e-12) {
@@ -208,11 +252,11 @@ class QuadraticBezier extends Bezier {
       final num B = 4 * (a.x * b.x + a.y * b.y);
       final num C = b.x * b.x + b.y * b.y;
 
-      final double sabc = 2 * sqrt(A + B + C);
-      final double a2 = sqrt(A);
-      final double a32 = 2 * A * a2;
-      final double c2 = 2 * sqrt(C);
-      final double bA = B / a2;
+      final num sabc = 2 * sqrt(A + B + C);
+      final num a2 = sqrt(A);
+      final num a32 = 2 * A * a2;
+      final num c2 = 2 * sqrt(C);
+      final num bA = B / a2;
 
       s = (a32 * sabc +
               a2 * B * (sabc - c2) +
@@ -227,7 +271,7 @@ class QuadraticBezier extends Bezier {
 /// large and sweep are 1 or 0 (True/False also work)
 class Arc extends SvgPath {
   final Point radius;
-  final double rotation;
+  final num rotation;
   final bool arc;
   final bool sweep;
   late final num radiusScale;
@@ -245,6 +289,23 @@ class Arc extends SvgPath {
   }) : super(start: start, end: end) {
     _parameterize();
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is Arc &&
+      radius == other.radius &&
+      rotation == other.rotation &&
+      arc == other.arc &&
+      sweep == other.sweep &&
+      super == other;
+
+  @override
+  int get hashCode =>
+      super.hashCode ^
+      radius.hashCode ^
+      rotation.hashCode ^
+      arc.hashCode ^
+      sweep.hashCode;
 
   @override
   String toString() => 'Arc(start=$start, radius=$radius, rotation=$rotation, '
@@ -289,7 +350,7 @@ class Arc extends SvgPath {
 
     final t1 = rxSq * y1primSq;
     final t2 = rySq * x1primSq;
-    double c = sqrt(((rxSq * rySq - t1 - t2) / (t1 + t2)).abs());
+    num c = sqrt(((rxSq * rySq - t1 - t2) / (t1 + t2)).abs());
 
     if (arc == sweep) {
       c = -c;
@@ -352,7 +413,7 @@ class Arc extends SvgPath {
   /// integration, and in that case it's simpler to just do a geometric
   /// approximation, as for cubic bezier curves.
   @override
-  double size({double error = defaultError, minDepth = defaultMinDepth}) {
+  num size({num error = defaultError, minDepth = defaultMinDepth}) {
     // This is equivalent of omitting the segment
     if (start == end) return 0;
 
@@ -387,6 +448,13 @@ class Arc extends SvgPath {
 class Move extends SvgPath {
   const Move({required Point to}) : super(start: to, end: to);
 
+
+  @override
+  bool operator ==(Object other) => other is Move && super == other;
+
+  @override
+  int get hashCode => super.hashCode + 0;
+
   @override
   String toString() => "Move(to=$start)";
 
@@ -394,8 +462,7 @@ class Move extends SvgPath {
   Point point(num pos) => start;
 
   @override
-  double size({double error = defaultError, int minDepth = defaultMinDepth}) =>
-      0;
+  num size({num error = defaultError, int minDepth = defaultMinDepth}) => 0;
 }
 
 /// Represents the closepath command
@@ -405,10 +472,12 @@ class Close extends Linear {
     required Point end,
   }) : super(start: start, end: end);
 
-  // def __eq__(self, other):
-  //     if not isinstance(other, Close):
-  //         return NotImplemented
-  //     return self.start == other.start and self.end == other.end
+
+  @override
+  bool operator ==(Object other) => other is Close && super == other;
+
+  @override
+  int get hashCode => super.hashCode + 0;
 
   @override
   String toString() => "Close(start=$start, end=$end)";
@@ -424,6 +493,14 @@ class Path extends ListBase<SvgPath> {
   Path() {
     segments = [];
   }
+
+  Path.fromSegments(this.segments);
+
+  @override
+  bool operator ==(Object other) => other is Path && segments == other.segments;
+
+  @override
+  int get hashCode => segments.hashCode;
 
   @override
   SvgPath operator [](int index) => segments[index]!;
@@ -445,7 +522,7 @@ class Path extends ListBase<SvgPath> {
       'Path(${[for (final s in segments) s.toString()].join(", ")})';
 
   void _calcLengths(
-      {double error = defaultError, int minDepth = defaultMinDepth}) {
+      {num error = defaultError, int minDepth = defaultMinDepth}) {
     if (_memoizedLength != null) return;
 
     final lengths = [
@@ -466,7 +543,7 @@ class Path extends ListBase<SvgPath> {
     }
   }
 
-  Point point({required num pos, double error = defaultError}) {
+  Point point({required num pos, num error = defaultError}) {
     // Shortcuts
     if (pos == 0.0) {
       return segments[0]!.point(pos);
@@ -505,7 +582,7 @@ class Path extends ListBase<SvgPath> {
     SvgPath? previousSegment;
     final end = last.end;
 
-    String formatNumber(num n) => n.toString();
+    String formatNumber(num n) => n.removePointIfInt.toString();
     String coord(Point p) => '${formatNumber(p.x)},${formatNumber(p.y)}';
 
     for (final segment in this) {
@@ -518,7 +595,7 @@ class Path extends ListBase<SvgPath> {
       } else if (segment is Move ||
           (currentPos != start) ||
           (start == end && previousSegment is! Move)) {
-        parts.add("M ${coord(start)}");
+        parts.add("M ${coord(segment.start)}");
       }
 
       if (segment is Line) {
@@ -540,7 +617,7 @@ class Path extends ListBase<SvgPath> {
       } else if (segment is Arc) {
         parts.add(
           "A ${coord(segment.radius)} ${formatNumber(segment.rotation)} "
-          "${(segment.arc ? 1 : 0).toDouble},${(segment.sweep ? 1 : 0).toDouble} ${coord(end)}",
+          "${segment.arc ? 1 : 0},${segment.sweep ? 1 : 0} ${coord(segment.end)}",
         );
       }
 
@@ -548,6 +625,6 @@ class Path extends ListBase<SvgPath> {
       previousSegment = segment;
     }
 
-    return parts.join(" ");
+    return parts.join(" ").toUpperCase();
   }
 }

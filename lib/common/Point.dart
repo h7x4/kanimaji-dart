@@ -13,6 +13,13 @@ class Point {
   operator *(covariant Point p) => Point(x * p.x, y * p.y);
   operator /(covariant Point p) => Point(x / p.x, y / p.y);
 
+  @override
+  bool operator ==(Object other) =>
+      other is Point && x == other.x && y == other.y;
+
+  @override
+  int get hashCode => x.hashCode ^ y.hashCode;
+
   Point addX(num n) => Point(x + n, y);
   Point addY(num n) => Point(x, y + n);
   Point add(num n) => Point(x + n, y + n);
