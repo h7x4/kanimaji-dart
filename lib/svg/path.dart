@@ -7,7 +7,7 @@ import 'dart:math' show sqrt, sin, cos, acos, log, pi;
 
 import 'package:bisection/extension.dart';
 
-import '../common/Point.dart';
+import '../common/point.dart';
 
 num radians(num n) => n * pi / 180;
 num degrees(num n) => n * 180 / pi;

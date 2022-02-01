@@ -2,7 +2,7 @@
 import 'dart:math' as math;
 
 
-import '../common/Point.dart';
+import '../common/point.dart';
 
 // class Point {
 //   final double x;

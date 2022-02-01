@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kanimaji/common/Point.dart';
+import 'package:kanimaji/common/point.dart';
 import 'package:kanimaji/svg/parser.dart';
 import 'package:kanimaji/svg/path.dart';
 

@@ -1,6 +1,6 @@
 /// SVG Path specification parser
 
-import '../common/Point.dart';
+import '../common/point.dart';
 import 'path.dart';
 
 const _commands = {

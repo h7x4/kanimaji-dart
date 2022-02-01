@@ -2,9 +2,9 @@ import 'dart:io';
 import 'dart:math' show min, sqrt, pow;
 
 import '../svg/parser.dart';
-import '../common/Point.dart';
+import '../common/point.dart';
 
-import 'bezierCubic.dart' as bezier_cubic;
+import 'bezier_cubic.dart' as bezier_cubic;
 import 'package:xml/xml.dart';
 import 'package:path/path.dart';
 
