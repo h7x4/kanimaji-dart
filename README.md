@@ -1,27 +1,18 @@
-<!-- 
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/guides/libraries/writing-package-pages). 
+# Kanimaji
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-library-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/developing-packages). 
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+Add animated kanji strokes to your app!
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+This library is a port of [Kanimaji][kanimaji], a library for animating kanji.
+It provides a way to convert stroke data from [KanjiVG][kanjivg] into kanji animations.
+
+This library ports this ability into flutter, and lets you choose speed, colors, and formats, in the form of a `Kanimaji` widget and a SVG/GIF generating function.
 
 ## Getting started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+Start by adding the project to your pubspec.yaml.
 
 ## Usage
 
@@ -36,5 +27,8 @@ const like = 'sample';
 
 The [svg library used](lib/svg) is mostly a rewrite of pythons [svg.path][svg.path].
 This is what kanimaji originally used for animation, and even thought there's a lot of svg path parsers in dart, I found none that was able to calculate the length of the path. If you do find one, please let me know!
+
+Also, do note that most of the comments in the project is brought over from the python projects.
+I've tried to adjust and remove some of them to make them more useful, but they shouldn't be trusted if there's doubt.
 
 [svg.path]: https://pypi.org/project/svg.path/

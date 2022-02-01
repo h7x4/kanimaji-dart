@@ -1,17 +1,15 @@
-/// ignore_for_file: non_constant_identifier_names, avoid_print, unused_local_variable, dead_code, constant_identifier_names
-
 import 'dart:io';
 import 'dart:math' show min, sqrt, pow;
 
 import '../svg/parser.dart';
 import '../common/Point.dart';
 
-import 'bezier_cubic.dart' as bezier_cubic;
+import 'bezierCubic.dart' as bezier_cubic;
 import 'package:xml/xml.dart';
 import 'package:path/path.dart';
 
 double _computePathLength(String path) =>
-    parse_path(path).size(error: 1e-8).toDouble();
+    parsePath(path).size(error: 1e-8).toDouble();
 
 String _shescape(String path) =>
     "'${path.replaceAll(RegExp(r"(?=['\\\\])"), "\\\\")}'";
@@ -682,7 +680,7 @@ void createAnimation({
 void main(List<String> args) {
   // createAnimation('assets/kanjivg/kanji/0f9b1.svg');
 
-  const kanji = '情報科学';
+  const kanji = '実例';
   final fileList = [];
   for (int k = 0; k < kanji.length; k++) {
     createAnimation(

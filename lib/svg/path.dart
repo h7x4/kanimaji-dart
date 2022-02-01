@@ -1,3 +1,6 @@
+/// This file contains classes for the different types of SVG path segments as
+/// well as a Path object that contains a sequence of path segments.
+
 import 'dart:collection';
 import 'dart:math' as math;
 import 'dart:math' show sqrt, sin, cos, acos, log, pi;
@@ -6,17 +9,8 @@ import 'package:bisection/extension.dart';
 
 import '../common/Point.dart';
 
-// try:
-//     from collections.abc import MutableSequence
-// except ImportError:
-//     from collections import MutableSequence
-
-// This file contains classes for the different types of SVG path segments as
-// well as a Path object that contains a sequence of path segments.
-
 double radians(num n) => n * pi / 180;
 double degrees(num n) => n * 180 / pi;
-
 
 const defaultMinDepth = 5;
 const defaultError = 1e-12;
@@ -101,11 +95,6 @@ class Linear extends SvgPath {
     required Point end,
   }) : super(start: start, end: end);
 
-  // def __ne__(self, other):
-  //     if not isinstance(other, Line):
-  //         return NotImplemented
-  //     return not self == other
-
   @override
   Point point(num pos) => start + (end - start).times(pos);
 
@@ -126,8 +115,6 @@ class Line extends Linear {
   String toString() {
     return "Line(start=$start, end=$end)";
   }
-  // @override
-  // operator ==(covariant Line other) => start == other.start && end == other.end;
 }
 
 class CubicBezier extends Bezier {
@@ -144,18 +131,6 @@ class CubicBezier extends Bezier {
   @override
   String toString() => "CubicBezier(start=$start, control1=$control1, "
       "control2=$control2, end=$end)";
-
-  // @override
-  // operator ==(covariant CubicBezier other) =>
-  //           start == other.start &&
-  //           and end == other.end &&
-  //           and control1 == other.control1 &&
-  //           and control2 == other.control2;
-
-  // def __ne__(self, other):
-  //     if not isinstance(other, CubicBezier):
-  //         return NotImplemented
-  //     return not self == other
 
   @override
   bool isSmoothFrom(Object? previous) => previous is CubicBezier
@@ -201,20 +176,6 @@ class QuadraticBezier extends Bezier {
   @override
   String toString() =>
       "QuadraticBezier(start=$start, control=$control, end=$end)";
-
-  // def __eq__(self, other):
-  //     if not isinstance(other, QuadraticBezier):
-  //         return NotImplemented
-  //     return (
-  //         self.start == other.start
-  //         and self.end == other.end
-  //         and self.control == other.control
-  //     )
-
-  // def __ne__(self, other):
-  //     if not isinstance(other, QuadraticBezier):
-  //         return NotImplemented
-  //     return not self == other
 
   @override
   bool isSmoothFrom(Object? previous) => previous is QuadraticBezier
@@ -286,30 +247,12 @@ class Arc extends SvgPath {
   }
 
   @override
-  String toString() => "Arc(start=$start, radius=$radius, rotation=$rotation, "
-      "arc=$arc, sweep=$sweep, end=$end)";
+  String toString() => 'Arc(start=$start, radius=$radius, rotation=$rotation, '
+      'arc=$arc, sweep=$sweep, end=$end)';
 
-  // def __eq__(self, other):
-  //     if not isinstance(other, Arc):
-  //         return NotImplemented
-  //     return (
-  //         self.start == other.start
-  //         and self.end == other.end
-  //         and self.radius == other.radius
-  //         and self.rotation == other.rotation
-  //         and self.arc == other.arc
-  //         and self.sweep == other.sweep
-  //     )
-
-  // def __ne__(self, other):
-  //     if not isinstance(other, Arc):
-  //         return NotImplemented
-  //     return not self == other
-
+  /// Conversion from endpoint to center parameterization
+  /// http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
   void _parameterize() {
-    // Conversion from endpoint to center parameterization
-    // http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
-
     // This is equivalent of omitting the segment, so do nothing
     if (start == end) return;
 
@@ -439,22 +382,13 @@ class Arc extends SvgPath {
   }
 }
 
-// Represents move commands. Does nothing, but is there to handle
-// paths that consist of only move commands, which is valid, but pointless.
+/// Represents move commands. Does nothing, but is there to handle
+/// paths that consist of only move commands, which is valid, but pointless.
 class Move extends SvgPath {
   const Move({required Point to}) : super(start: to, end: to);
 
   @override
   String toString() => "Move(to=$start)";
-//     def __eq__(self, other):
-//         if not isinstance(other, Move):
-//             return NotImplemented
-//         return self.start == other.start
-
-//     def __ne__(self, other):
-//         if not isinstance(other, Move):
-//             return NotImplemented
-//         return not self == other
 
   @override
   Point point(num pos) => start;
@@ -464,7 +398,7 @@ class Move extends SvgPath {
       0;
 }
 
-// Represents the closepath command
+/// Represents the closepath command
 class Close extends Linear {
   const Close({
     required Point start,
@@ -616,33 +550,4 @@ class Path extends ListBase<SvgPath> {
 
     return parts.join(" ");
   }
-
-//     def __delitem__(self, index):
-//         del self._segments[index]
-//         self._length = None
-
-//     def reverse(self):
-//         # Reversing the order of a path would require reversing each element
-//         # as well. That's not implemented.
-//         raise NotImplementedError
-
-//     def __len__(self):
-//         return len(self._segments)
-
-//     def __eq__(self, other):
-
-//         if not isinstance(other, Path):
-//             return NotImplemented
-//         if len(self) != len(other):
-//             return False
-//         for s, o in zip(self._segments, other._segments):
-//             if not s == o:
-//                 return False
-//         return True
-
-//     def __ne__(self, other):
-//         if not isinstance(other, Path):
-//             return NotImplemented
-//         return not self == other
-
 }
