@@ -274,21 +274,19 @@ class Arc extends SvgPath {
   final num rotation;
   final bool arc;
   final bool sweep;
-  late final num radiusScale;
-  late final Point center;
-  late final num theta;
-  late final num delta;
+  // late final num radiusScale;
+  // late final Point center;
+  // late final num theta;
+  // late num delta;
 
-  Arc({
+  const Arc({
     required Point start,
     required Point end,
     required this.radius,
     required this.rotation,
     required this.arc,
     required this.sweep,
-  }) : super(start: start, end: end) {
-    _parameterize();
-  }
+  }) : super(start: start, end: end);
 
   @override
   bool operator ==(Object other) =>
@@ -311,68 +309,53 @@ class Arc extends SvgPath {
   String toString() => 'Arc(start=$start, radius=$radius, rotation=$rotation, '
       'arc=$arc, sweep=$sweep, end=$end)';
 
-  /// Conversion from endpoint to center parameterization
-  /// http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
-  void _parameterize() {
-    // This is equivalent of omitting the segment, so do nothing
-    if (start == end) return;
 
-    // This should be treated as a straight line
-    if (radius.x == 0 || radius.y == 0) return;
+  // Conversion from endpoint to center parameterization
+  // http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
+  num get _cosr => cos(radians(rotation));
+  num get _sinr => sin(radians(rotation));
+  num get _dx => (start.x - end.x) / 2;
+  num get _dy => (start.y - end.y) / 2;
+  num get _x1prim => _cosr * _dx + _sinr * _dy;
+  num get _x1primSq => _x1prim * _x1prim;
+  num get _y1prim => -_sinr * _dx + _cosr * _dy;
+  num get _y1primSq => _y1prim * _y1prim;
+  num get _rx => (radiusScale > 1 ? radiusScale : 1) * radius.x;
+  num get _ry => (radiusScale > 1 ? radiusScale : 1) * radius.y;
+  num get _rxSq => _rx * _rx;
+  num get _rySq => _ry * _ry;
+  num get _ux => (_x1prim - _cxprim) / _rx;
+  num get _uy => (_y1prim - _cyprim) / _ry;
+  num get _vx => (-_x1prim - _cxprim) / _rx;
+  num get _vy => (-_y1prim - _cyprim) / _ry;
+  num get t1 => _rxSq * _y1primSq;
+  num get t2 => _rySq * _x1primSq;
+  num get c =>
+      (arc == sweep ? 1 : -1) *
+      sqrt(((_rxSq * _rySq - t1 - t2) / (t1 + t2)).abs());
+  num get _cxprim => c * _rx * _y1prim / _ry;
+  num get _cyprim => -c * _ry * _x1prim / _rx;
 
-    final cosr = cos(radians(rotation));
-    final sinr = sin(radians(rotation));
-    final dx = (start.x - end.x) / 2;
-    final dy = (start.y - end.y) / 2;
-    final x1prim = cosr * dx + sinr * dy;
-    final x1primSq = x1prim * x1prim;
-    final y1prim = -sinr * dx + cosr * dy;
-    final y1primSq = y1prim * y1prim;
+  num get radiusScale {
+    final rs = (_x1primSq / (radius.x * radius.x)) +
+        (_y1primSq / (radius.y * radius.y));
+    return rs > 1 ? sqrt(rs) : 1;
+  }
 
-    num rx = radius.x;
-    num rxSq = rx * rx;
-    num ry = radius.y;
-    num rySq = ry * ry;
+  Point get center => Point(
+        (_cosr * _cxprim - _sinr * _cyprim) + ((start.x + end.x) / 2),
+        (_sinr * _cxprim + _cosr * _cyprim) + ((start.y + end.y) / 2),
+      );
+  
+  num get theta {
+    final num n = sqrt(_ux * _ux + _uy * _uy);
+    final num p = _ux;
+    return (((_uy < 0) ? -1 : 1) * degrees(acos(p / n))) % 360;
+  }
 
-    // Correct out of range radii
-    num radiusScale = (x1primSq / rxSq) + (y1primSq / rySq);
-    if (radiusScale > 1) {
-      radiusScale = sqrt(radiusScale);
-      rx *= radiusScale;
-      ry *= radiusScale;
-      rxSq = rx * rx;
-      rySq = ry * ry;
-      this.radiusScale = radiusScale;
-    } else {
-      // SVG spec only scales UP
-      this.radiusScale = 1;
-    }
-
-    final t1 = rxSq * y1primSq;
-    final t2 = rySq * x1primSq;
-    num c = sqrt(((rxSq * rySq - t1 - t2) / (t1 + t2)).abs());
-
-    if (arc == sweep) {
-      c = -c;
-    }
-    final cxprim = c * rx * y1prim / ry;
-    final cyprim = -c * ry * x1prim / rx;
-
-    center = Point(
-      (cosr * cxprim - sinr * cyprim) + ((start.x + end.x) / 2),
-      (sinr * cxprim + cosr * cyprim) + ((start.y + end.y) / 2),
-    );
-
-    final ux = (x1prim - cxprim) / rx;
-    final uy = (y1prim - cyprim) / ry;
-    final vx = (-x1prim - cxprim) / rx;
-    final vy = (-y1prim - cyprim) / ry;
-    num n = sqrt(ux * ux + uy * uy);
-    num p = ux;
-    theta = (((uy < 0) ? -1 : 1) * degrees(acos(p / n))) % 360;
-
-    n = sqrt((ux * ux + uy * uy) * (vx * vx + vy * vy));
-    p = ux * vx + uy * vy;
+  num get delta {
+    final num n = sqrt((_ux * _ux + _uy * _uy) * (_vx * _vx + _vy * _vy));
+    final num p = _ux * _vx + _uy * _vy;
     num d = p / n;
     // In certain cases the above calculation can through inaccuracies
     // become just slightly out of range, f ex -1.0000000000000002.
@@ -381,8 +364,8 @@ class Arc extends SvgPath {
     } else if (d < -1.0) {
       d = -1.0;
     }
-    delta = ((((ux * vy - uy * vx) < 0) ? -1 : 1) * degrees(acos(d))) % 360;
-    if (!sweep) delta -= 360;
+
+    return ((((_ux * _vy - _uy * _vx) < 0) ? -1 : 1) * degrees(acos(d))) % 360 - (!sweep ? 360 : 0);
   }
 
   @override
@@ -448,7 +431,6 @@ class Arc extends SvgPath {
 class Move extends SvgPath {
   const Move({required Point to}) : super(start: to, end: to);
 
-
   @override
   bool operator ==(Object other) => other is Move && super == other;
 
@@ -471,7 +453,6 @@ class Close extends Linear {
     required Point start,
     required Point end,
   }) : super(start: start, end: end);
-
 
   @override
   bool operator ==(Object other) => other is Close && super == other;
