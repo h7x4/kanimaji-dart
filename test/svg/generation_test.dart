@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kanimaji/svg/parser.dart';
 
 void main() {
-  test('Test SVG Paths', () {
+  test('Test generating SVG path strings', () {
     final paths = [
       "M 100,100 L 300,100 L 200,300 Z",
       "M 0,0 L 50,20 M 100,100 L 300,100 L 200,300 Z",

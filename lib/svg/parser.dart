@@ -31,11 +31,11 @@ const _commands = {
 final _commandPattern = RegExp("(?=[${_commands.join('')}])");
 final _floatPattern = RegExp(r"^[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?");
 
-class _ParserResult<T> {
+class ParserResult<T> {
   final T value;
   final String remaining;
 
-  const _ParserResult({required this.value, required this.remaining});
+  const ParserResult({required this.value, required this.remaining});
 }
 
 class InvalidPathError implements Exception {
@@ -73,7 +73,7 @@ String _stripArray(String stringToParse) {
   return stringToParse;
 }
 
-_ParserResult<num> _parseNumber(String stringToParse) {
+ParserResult<num> _parseNumber(String stringToParse) {
   final res = _floatPattern.firstMatch(stringToParse);
   if (res == null) {
     throw InvalidPathError("Expected a number, got '$stringToParse'.");
@@ -86,10 +86,10 @@ _ParserResult<num> _parseNumber(String stringToParse) {
       stringToParse.substring(0, start) + stringToParse.substring(end);
   stringToParse = _stripArray(stringToParse);
 
-  return _ParserResult(value: number, remaining: stringToParse);
+  return ParserResult(value: number, remaining: stringToParse);
 }
 
-_ParserResult<num> _parseUnsignedNumber(String stringToParse) {
+ParserResult<num> _parseUnsignedNumber(String stringToParse) {
   final number = _parseNumber(stringToParse);
   if (number.value < 0) {
     throw InvalidPathError("Expected a non-negative number, got '$number'.");
@@ -97,18 +97,18 @@ _ParserResult<num> _parseUnsignedNumber(String stringToParse) {
   return number;
 }
 
-_ParserResult<Point> _parseCoordinatePair(String stringToParse) {
+ParserResult<Point> _parseCoordinatePair(String stringToParse) {
   final x = _parseNumber(stringToParse);
   final y = _parseNumber(x.remaining);
-  return _ParserResult(value: Point(x.value, y.value), remaining: y.remaining);
+  return ParserResult(value: Point(x.value, y.value), remaining: y.remaining);
 }
 
-_ParserResult<bool> _parseflag(String stringToParse) {
+ParserResult<bool> _parseflag(String stringToParse) {
   final flag = stringToParse[0];
   stringToParse = stringToParse.substring(1);
   stringToParse = _stripArray(stringToParse);
-  if (flag == '0') return _ParserResult(value: false, remaining: stringToParse);
-  if (flag == '1') return _ParserResult(value: true, remaining: stringToParse);
+  if (flag == '0') return ParserResult(value: false, remaining: stringToParse);
+  if (flag == '1') return ParserResult(value: true, remaining: stringToParse);
 
   throw InvalidPathError("Expected either 1 or 0, got '$flag'");
 }
@@ -120,19 +120,26 @@ const fieldParsers = {
   "f": _parseflag,
 };
 
-class _Command {
+class Command {
   final String command;
   final String args;
 
-  const _Command({required this.command, required this.args});
+  const Command({required this.command, required this.args});
 
   @override
-  String toString() => 'Command: $command $args';
+  bool operator ==(Object other) =>
+      other is Command && command == other.command && args == other.args;
+
+  @override
+  int get hashCode => command.hashCode ^ args.hashCode;
+
+  @override
+  String toString() => '$command $args';
 }
 
 // Splits path into commands and arguments
-List<_Command> _commandifyPath(String pathdef) {
-  List<_Command> tokens = [];
+List<Command> commandifyPath(String pathdef) {
+  List<Command> tokens = [];
   List<String> token = [];
   for (String c in pathdef.split(_commandPattern)) {
     String x = c[0];
@@ -142,7 +149,7 @@ List<_Command> _commandifyPath(String pathdef) {
       throw InvalidPathError("Path does not start with a command: $pathdef");
     }
     if (token.isNotEmpty) {
-      tokens.add(_Command(command: token[0], args: token[1]));
+      tokens.add(Command(command: token[0], args: token[1]));
       // yield token;
     }
     if (x == "z" || x == "Z") {
@@ -156,7 +163,7 @@ List<_Command> _commandifyPath(String pathdef) {
       token.add(y);
     }
   }
-  tokens.add(_Command(command: token[0], args: token[1]));
+  tokens.add(Command(command: token[0], args: token[1]));
   // yield token;
   return tokens;
 }
@@ -168,12 +175,23 @@ class Token {
   const Token({required this.command, required this.args});
 
   @override
-  String toString() => 'Token: $command ($args)';
+  bool operator ==(Object other) =>
+      other is Token &&
+      command == other.command &&
+      args.length == other.args.length &&
+      ![for (int i = 0; i < args.length; i++) args[i] == other.args[i]]
+          .any((b) => !b);
+
+  @override
+  int get hashCode => command.hashCode ^ args.hashCode;
+
+  @override
+  String toString() => '$command ($args)';
 }
 
-List<Token> _tokenizePath(String pathdef) {
+List<Token> tokenizePath(String pathdef) {
   List<Token> tokens = [];
-  for (final token in _commandifyPath(pathdef)) {
+  for (final token in commandifyPath(pathdef)) {
     String command = token.command;
     String args = token.args;
 
@@ -218,7 +236,7 @@ Path parsePath(String pathdef) {
   String? lastCommand;
   Point currentPos = Point.zero;
 
-  for (final token in _tokenizePath(pathdef)) {
+  for (final token in tokenizePath(pathdef)) {
     final command = token.command.toUpperCase();
     final absolute = token.command.toUpperCase() == token.command;
     if (command == "M") {
